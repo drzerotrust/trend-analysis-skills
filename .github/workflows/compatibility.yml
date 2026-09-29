@@ -1,0 +1,40 @@
+name: Compatibility
+
+on:
+  workflow_dispatch:
+    inputs:
+      cli_repository:
+        description: "Trend Engine GitHub repository (owner/repository)"
+        required: true
+        type: string
+      cli_ref:
+        description: "Pinned Trend Engine release tag or full commit SHA"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check out the selected CLI release
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.cli_repository }}
+          ref: ${{ inputs.cli_ref }}
+          path: .cli
+          persist-credentials: false
+      - name: Install the CLI and its bundled schemas
+        working-directory: .cli
+        run: |
+          python3 -m venv ./venv
+          ./venv/bin/python -m pip install .
+          echo "$GITHUB_WORKSPACE/.cli/venv/bin" >> "$GITHUB_PATH"
+      - name: Check skill compatibility offline
+        run: ./.cli/venv/bin/python -m unittest discover -s tests -v

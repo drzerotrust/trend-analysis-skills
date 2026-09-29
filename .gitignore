@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+openclaw.local.json
+venv/
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite3
+reports/
+*.swp
+*.swo
+
+
