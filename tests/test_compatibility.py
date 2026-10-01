@@ -38,6 +38,12 @@ class CompatibilityTests(unittest.TestCase):
         for key in ("YOUTUBE_API_KEY", "PYTHONPATH", "PYTHONHOME"):
             self.environment.pop(key, None)
 
+        # Explicit selection isolates tests from the installed CLI's real credentials.
+        self.env_file = self.directory / "private test.env"
+        self.env_file.write_text("", encoding="utf-8")
+        self.environment["TREND_ENGINE_ENV_FILE"] = str(self.env_file)
+        self.environment.pop("PYTHON_DOTENV_DISABLED", None)
+
     def run_cli(self, *argv):
         return subprocess.run(
             [self.binary, *argv],
@@ -131,7 +137,7 @@ class CompatibilityTests(unittest.TestCase):
                 self.assertEqual(document["errors"], [])
 
         files = list(self.directory.iterdir())
-        self.assertEqual(files, [self.config])
+        self.assertCountEqual(files, [self.config, self.env_file])
 
     def test_skill_preflight_example_matches_compatibility_manifest(self):
         path = SKILL / "SKILL.md"
@@ -218,7 +224,7 @@ class CompatibilityTests(unittest.TestCase):
         self.assertIn("No stored snapshot", result.stderr)
         files = list(self.directory.iterdir())
 
-        self.assertEqual(files, [self.config])
+        self.assertCountEqual(files, [self.config, self.env_file])
 
     def test_config_error_is_local_and_redacted(self):
         self.config.write_text("test-private-setting = true", encoding="utf-8")
@@ -231,9 +237,48 @@ class CompatibilityTests(unittest.TestCase):
         self.assertNotIn("test-private-setting", result.stdout + result.stderr)
         files = list(self.directory.iterdir())
 
-        self.assertEqual(files, [self.config])
+        self.assertCountEqual(files, [self.config, self.env_file])
 
-    def test_presence_checks_do_not_load_dotenv_or_reveal_keys(self):
+    def test_explicit_env_file_loads_without_revealing_keys(self):
+        self.env_file.write_text(
+            "YOUTUBE_API_KEY=test-private-file\n", encoding="utf-8"
+        )
+        result = self.run_cli("doctor", "--json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        document = json.loads(result.stdout)
+        configuration = document["configuration"]
+
+        self.assertTrue(configuration["youtube_key_present"])
+        self.assertFalse(document["network_checked"])
+        self.assertNotIn("test-private", result.stdout + result.stderr)
+
+        # Even an explicitly empty process variable takes precedence over the file.
+        self.environment["YOUTUBE_API_KEY"] = ""
+        result = self.run_cli("doctor", "--json")
+        document = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(document["configuration"]["youtube_key_present"])
+
+    def test_invalid_env_is_redacted_but_does_not_block_stored_reports(self):
+        self.env_file.write_text('YOUTUBE_API_KEY="test-private\n', encoding="utf-8")
+        result = self.run_cli("doctor", "--json", "--config", str(self.config))
+
+        self.assertEqual(result.returncode, 2)
+        document = json.loads(result.stdout)
+
+        self.assertIn("environment_invalid", document["errors"])
+        self.assertNotIn("test-private", result.stdout + result.stderr)
+        self.assertNotIn(str(self.env_file), result.stdout + result.stderr)
+
+        result = self.run_cli("report", "--json", "--config", str(self.config))
+        report = json.loads(result.stdout)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIsNone(report["collected_at"])
+
+    def test_presence_checks_ignore_unselected_dotenv_and_never_reveal_keys(self):
         dotenv_path = self.directory / ".env"
         dotenv_path.write_text("YOUTUBE_API_KEY=test-dotenv\n", encoding="utf-8")
         result = self.run_cli("doctor", "--json")
@@ -266,7 +311,7 @@ class CompatibilityTests(unittest.TestCase):
 
         files = list(self.directory.iterdir())
 
-        self.assertEqual(files, [self.config])
+        self.assertCountEqual(files, [self.config, self.env_file])
 
 
 if __name__ == "__main__":

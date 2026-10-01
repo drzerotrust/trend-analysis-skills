@@ -21,7 +21,7 @@ The CLI itself does not read `TREND_ENGINE_CONFIG`.
 Before first use, or after the installation/config changes, run this offline check:
 
 ```bash
-trend-engine doctor --json --config "$TREND_ENGINE_CONFIG" --min-version 0.4.0 --max-version 0.5.0 --require-report-schema 3 --require-doctor-schema 2
+trend-engine doctor --json --config "$TREND_ENGINE_CONFIG" --min-version 0.4.1 --max-version 0.5.0 --require-report-schema 3 --require-doctor-schema 2
 ```
 
 Require exit 0, `doctor_version: 2`, `status: "success"`, and
@@ -65,9 +65,17 @@ whole snapshot; it does not merge with older source data. Use a separately
 configured database if the user wants isolated collection history. No country
 flag exists: use the operator's TOML config for countries and sample limits.
 
-The optional `YOUTUBE_API_KEY` is environment-only; no other key is used.
-`.env` is not loaded by the CLI. Do not print keys, read them into the conversation,
-put them in command arguments, or copy them into this skill.
+The optional `YOUTUBE_API_KEY` can be exported or loaded from a trusted dotenv file;
+no other provider key is used. Collection and doctor select one file: explicit
+`TREND_ENGINE_ENV_FILE`, then the CLI checkout's `.env`, then
+`$XDG_CONFIG_HOME/trend-engine/.env` (or `~/.config/trend-engine/.env`). Process
+variables always win. There is no arbitrary working-directory search; `--config`
+selects TOML settings, not dotenv. Let the operator configure an absolute credential
+path accessible to the executing process. Invalid files return doctor exit 2 with
+`environment_invalid`; do not bypass that error or inspect the file's contents.
+Stored reports and discovery commands do not load credentials.
+Do not print keys, read them into the conversation, put them in command arguments,
+or copy them into this skill.
 `doctor` reports presence, not validity. Host skill environment injection does not
 automatically populate an OpenClaw sandbox; missing sandbox setup needs operator
 configuration, not a bypass.
