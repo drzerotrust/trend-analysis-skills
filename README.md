@@ -14,8 +14,29 @@ credentials are not included in this repository.
 - A trusted Trend Engine TOML config, supplied as an absolute path.
 - Network access for fresh collection. Stored reports work offline.
 
-This release uses report schema **3** and doctor schema **2**. From a compatible
-Trend Engine checkout, install the CLI in a local environment:
+This release uses report schema **3** and doctor schema **2**. With
+[uv](https://docs.astral.sh/uv/getting-started/installation/) installed, install the
+CLI in its own isolated tool environment:
+
+```bash
+uv tool install --python 3.12 "git+https://github.com/drzerotrust/trend-analysis.git"
+trend-engine --version
+```
+
+The GitHub repository is `trend-analysis`; the installed command is `trend-engine`.
+This installs the current default branch, not a tagged release. The doctor preflight
+below checks whether that installation is compatible with this skill. To pin a
+known compatible revision, append `@<full-commit-hash>` to the Git URL; a release tag
+can be used once published. Update an unpinned install with `uv tool upgrade trend-engine`.
+
+Make uv's executable directory available on the OpenClaw execution PATH. Find it
+with `uv tool dir --bin`; for a terminal installation, `uv tool update-shell` can
+update your shell setup. Restart with the updated PATH; changing your terminal does
+not update an already-running gateway. See [uv tool installation](https://docs.astral.sh/uv/guides/tools/#installing-tools).
+
+### Local development alternative
+
+From a compatible CLI checkout, use its local venv:
 
 ```bash
 python3 -m venv ./venv
@@ -42,11 +63,19 @@ compatibility before the skill runs collection or reports.
 
 ## Configuration
 
-Use the CLI checkout's `config.toml`, or keep a trusted copy at an absolute path.
-Edit it to choose countries, sources, and sample limits. Database and report paths
-inside it are relative to the config's directory. Supply that absolute config path
-in your request, or set `TREND_ENGINE_CONFIG` as shown below. The skill passes it
-as `--config`; the CLI does not read `TREND_ENGINE_CONFIG` itself.
+The tool install does not create a config file. Save a trusted `config.toml` in a
+writable directory outside uv's managed environment. A minimal config is:
+
+```toml
+database = "trend_engine.db"
+reports_dir = "reports"
+```
+
+Unspecified countries, sources, and sample limits use the CLI defaults. A full
+template is available in the [CLI repository](https://github.com/drzerotrust/trend-analysis).
+Database and report paths are relative to the config's directory. Supply its
+absolute path in your request, or set `TREND_ENGINE_CONFIG` as shown below. The
+skill passes it as `--config`; the CLI does not read `TREND_ENGINE_CONFIG` itself.
 
 Optional `YOUTUBE_API_KEY` enables YouTube collection. No other provider key is used;
 Hacker News is keyless. Export the key in the agent's execution environment or set
@@ -197,3 +226,7 @@ The **Compatibility** GitHub Actions workflow runs the same checks against a nor
 CLI installation. Start it with the CLI's GitHub `owner/repository` and a pinned
 release tag or commit. It has no default upstream repository or branch; each run
 uses the explicit revision you select. No API keys are needed.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
