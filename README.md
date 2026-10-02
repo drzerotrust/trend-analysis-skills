@@ -61,10 +61,13 @@ The skill requires `trend-engine` on PATH; detecting the binary does not check i
 version or install it automatically. The offline doctor preflight below checks
 compatibility before the skill runs collection or reports.
 
-## Configuration
+## One-time configuration
+
+### Create the CLI config
 
 The tool install does not create a config file. Save a trusted `config.toml` in a
-writable directory outside uv's managed environment. A minimal config is:
+writable directory outside uv's managed environment. For example, create
+`~/.config/trend-engine/` and save `config.toml` there with:
 
 ```toml
 database = "trend_engine.db"
@@ -73,9 +76,41 @@ reports_dir = "reports"
 
 Unspecified countries, sources, and sample limits use the CLI defaults. A full
 template is available in the [CLI repository](https://github.com/drzerotrust/trend-analysis).
-Database and report paths are relative to the config's directory. Supply its
-absolute path in your request, or set `TREND_ENGINE_CONFIG` as shown below. The
-skill passes it as `--config`; the CLI does not read `TREND_ENGINE_CONFIG` itself.
+Database and report paths are relative to the config's directory.
+
+### Tell OpenClaw where the config lives
+
+Configure this once, not in every prompt. Merge this entry into your
+`~/.openclaw/openclaw.json`, preserving existing settings:
+
+```json
+{
+  "skills": {
+    "entries": {
+      "trend-analisis": {
+        "enabled": true,
+        "env": {"TREND_ENGINE_CONFIG": "/absolute/path/to/config.toml"}
+      }
+    }
+  }
+}
+```
+
+Replace the placeholder with the full path to the file you created. Use an
+absolute path, not `~` or `$HOME` inside the JSON value.
+
+OpenClaw supplies `TREND_ENGINE_CONFIG` when the skill runs. The skill is instructed
+to pass that path as `--config` for `doctor`, `run`, and `report`. You can then ask
+for trends without repeating the path. A trusted absolute config path supplied in
+a request overrides this default; if neither is supplied, the skill asks for one.
+
+The CLI itself does not read `TREND_ENGINE_CONFIG` or automatically discover
+`~/.config/trend-engine/config.toml`. When calling it manually, pass `--config`
+unless `config.toml` is in your current directory. Exporting the variable in an
+unrelated terminal does not configure an already-running OpenClaw gateway.
+See [OpenClaw skill environment configuration](https://docs.openclaw.ai/tools/skills-config).
+
+### Optional credentials and offline check
 
 Optional `YOUTUBE_API_KEY` enables YouTube collection. No other provider key is used;
 Hacker News is keyless. Export the key in the agent's execution environment or set
@@ -117,18 +152,14 @@ The clone root directly contains `trend-analisis/`; do not point at an additiona
   "skills": {
     "load": {
       "extraDirs": ["/absolute/path/to/trend-analisis-skills"]
-    },
-    "entries": {
-      "trend-analisis": {
-        "enabled": true,
-        "env": {"TREND_ENGINE_CONFIG": "/absolute/path/to/config.toml"}
-      }
     }
   }
 }
 ```
 
-Replace both placeholder paths. If this repository is nested in a CLI checkout at
+Keep the `skills.entries` configuration from the one-time setup above; this adds
+`skills.load` alongside it. Replace the clone-directory placeholder. If this
+repository is nested in a CLI checkout at
 `/path/to/trend-engine/skills`, use that directory for `extraDirs`. The repositories
 remain independent. A repository already placed in your OpenClaw workspace's
 `skills/` directory can be discovered there without an extra directory entry.
